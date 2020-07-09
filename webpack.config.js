@@ -42,6 +42,35 @@ const cssLoaders = extra => {
     return loaders
 }
 
+const babelOptions = preset => {
+    const options = {
+        presets: [
+            '@babel/preset-env',
+        ],
+        plugins: [
+            '@babel/plugin-proposal-class-properties'
+        ]
+    }
+
+    if (preset) {
+        options.presets.push(preset);
+    }
+    return options
+}
+
+const jsLoaders = () => {
+    const loaders = [{
+        loader: 'babel-loader',
+        options: babelOptions()
+    }]
+
+    if (isDev) {
+        loaders.push('eslint-loader');
+    }
+
+    return loaders;
+}
+
 module.exports = {
     context: path.resolve(__dirname, 'src'),
     mode: 'development',
@@ -65,6 +94,7 @@ module.exports = {
         port: 4200,
         hot: isDev
     },
+    devtool: isDev ? 'source-map' : '',
     plugins: [
         new HTMLWebpackPlugin({
             template: './index.html',
@@ -118,32 +148,14 @@ module.exports = {
             {
                 test: /\.js$/,
                 exclude: /node_modules/,
-                loader: {
-                    loader: 'babel-loader',
-                    options: {
-                        presets: [
-                            '@babel/preset-env'
-                        ],
-                        plugins: [
-                            '@babel/plugin-proposal-class-properties'
-                        ]
-                    }
-                }
+                use: jsLoaders()
             },
             {
                 test: /\.ts$/,
                 exclude: /node_modules/,
                 loader: {
                     loader: 'babel-loader',
-                    options: {
-                        presets: [
-                            '@babel/preset-env',
-                            '@babel/preset-typescript'
-                        ],
-                        plugins: [
-                            '@babel/plugin-proposal-class-properties'
-                        ]
-                    }
+                    options: babelOptions('@babel/preset-typescript')
                 }
             }
         ]
