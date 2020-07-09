@@ -1,0 +1,219 @@
+const path = require('path');
+const HTMLWebpackPlugin = require('html-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const OptimizeCSSAssetsWebpackPlugin = require('optimize-css-assets-webpack-plugin');
+const TerserWebpackPlugin = require('terser-webpack-plugin');
+
+
+const isDev = process.env.NODE_ENV === 'development';
+const isProd = !isDev;
+const optimization = () => {
+    const config = {
+        splitChunks: {
+            chunks: 'all'
+        }
+    }
+
+    if (isProd) {
+        config.minimizer = [
+           new OptimizeCSSAssetsWebpackPlugin(),
+           new TerserWebpackPlugin()
+        ]   
+    }
+    return config;
+};
+
+const filename = ext => isDev ? `[name].${ext}` : `[name].[hash].${ext}`;
+
+const cssLoaders = extra => {
+    const loaders = [{
+        loader: MiniCssExtractPlugin.loader,
+        options: {
+            hmr: isDev,
+            reloadAll: true
+        },
+    }, 'css-loader']
+
+    if (extra) {
+        loaders.push(extra);       
+    }
+    return loaders
+};
+
+
+const jsLoaders = () => {
+    const loaders = [{
+        loader: 'babel-loader',
+        options: babelOptions()
+    }]
+
+    if (isDev) {
+        loaders.push('eslint-loader');
+    }
+
+    return loaders;
+}
+
+const plugins = () => {
+    const base = [
+        new HTMLWebpackPlugin({
+            template: './index.html',
+            minify: {
+                collapseWhitespace: isProd
+            }
+        }),
+        new CleanWebpackPlugin(),
+        new CopyWebpackPlugin({
+            patterns: [
+                {
+                    from: path.resolve(__dirname, 'src/favicon.ico'),
+                    to: path.resolve(__dirname, 'dist')
+                }
+            ]
+        }),
+        new MiniCssExtractPlugin({
+            filename: filename('css')
+        })
+    ]
+
+    if (isProd) {
+        base.push(new BundleAnalyzerPlugin())
+    }
+    return base
+}
+
+
+module.exports = {
+context: path.resolve(__dirname,'src'),				- строка. Путь до папки с исходниками, с которыми работает webpack. Если указан, то в дальнейшем для всех вайлов, заимствованных в настройке, не указываем папку.
+mode: 'development' | 'production' 				- режим сборки webpack (в prod код минифицирован);
+entry: './index.js'						- точка входа;
+
+<// могут быть несколько точек входа. Тогда entry будет объектом
+entry: {
+        main: './index.js',
+        analytics: './analytics.js'
+    } 
+//>
+
+output: {
+        filename: 'bundle.js',					- имя финального файла в котором соберутся все файлы .js;
+
+<// если entry объект тогда нужно применять паттерн для имени, который будет динамически менять имя финального файла в зависимости от точки входа	
+	filename: '[name].bundle.js'
+//>
+
+<//для решения проблем с кешом применяется паттерн, который задает имя файла в зависимости от его контента
+	filename: '[name].[contenthash].js'
+//>
+ 
+        path: path.resolve(__dirname, 'dist'),			- путь до папки с финальным файлом;
+    },
+
+resolve: {							- гибкая настройка разрешений;
+        extensions: ['.js', '.json', '.png'],			- при экспорте файлов можно не писть расширение;			
+        alias: {						- позволяет сократить написание пути. См. VUE '@';
+            '@models': path.resolve(__dirname, 'src/models'),
+            '@': path.resolve(__dirname, 'src')
+        }
+    },
+devtool: isDev ? 'source-map' : '',				- исходные карты;
+optimization: optimization(),					- оптимизация финальной сборки webpack;
+
+devServer: {							- "горячий" перезапуск проекта в при изменениях. Так же собирает проект посредством webpack, только сохраняет bundle и все сопутствующие файлы в оперативу;
+        port: 4200,						- порт на котором крутится devServer;
+	hot:isDev 						- признак, что необходимо включать только в dev;
+    },
+
+<// Плагины необходимо устанавливать отдельно для удобства работы. Всегда массив, принимающий инстансы новых объектов.//>
+
+plugins:[
+        new HTMLWebpackPlugin({					- плагин для работы с HTML;
+            title: 'Webpack course',				- title страницы;
+	    template: './index.html',				- путь к файлу с контентом, который необходимо вставить в динамически создаваемый файл index.html;
+	    minify: {						
+                collapseWhitespace: isProd			- оптимизация HTML в prod;
+            }
+        }),
+	new CleanWebpackPlugin(),				- плагин, очищающий папку dist;
+	new CopyWebpackPlugin({					- плагин копирования;
+            patterns: [
+                {
+                    from: path.resolve(__dirname, 'src/favicon.ico'),
+                    to: path.resolve(__dirname, 'dist')
+                }
+            ]
+        }),
+	new MiniCssExtractPlugin({				- плагин, добавляющий CSS в dist;
+            filename: '[name].[contenthash].css'		- имя файла;
+        })
+    ],
+
+<// Webpack понимает только js/Json. Для того, чтобы работать с другими типами файлов используют лоадеры.//>
+module: {
+        rules: [
+            {
+                test: /\.css$/,					- регулярка. Показывает какие типы файлов обрабатываются.
+                use: ['style-loader', 'css-loader']		- лоадеры. Правила обработки этих файлов. Webpack читает справа налево, поэтому больший функционал пишется левее. Лоадеры ставятся отдельно;
+            },
+
+<// Если добавлен MiniCssExtractPlugin, то пишем так:
+	    {
+                test: /\.css$/,
+                use: [{
+                    loader: MiniCssExtractPlugin.loader,	- MiniCssExtractPlugin - класс, обладающий своими свойствами;
+                    options: {
+                        hmr: isDev,				- HotModuleReplacement. Изменяем сущности без перезагрузки в режиме разработки;
+                        reloadAll: true				- 
+                    },
+                }, 'css-loader']
+            },
+//>
+	
+	    {
+                test: /\.(png|jpg|svg|gif)$/,			- регулярка отбора картинок;
+                use: ['file-loader']				- лоадер для обработки файлов (картинок);
+            },
+	    {
+                test: /\.(ttf|woff|woff2|eot)$/,		- отбор файлов шрифтов;
+                use: ['file-loader']				- лоадер для работы с файлами;
+            },
+            {
+                test: /\.xml$/,					- отбор xml;
+                use: ['xml-loader']				- лоадер для работы с файлами;
+            },
+	    {
+                test: /\.less$/,				- обработка less;
+                use: cssLoaders('less-loader')
+            },
+	    {
+                test: /\.s[ac]ss$/,				- обработка scss
+                use: cssLoaders('sass-loader')
+            },
+	    {							- обработка babel;
+                test: /\.js$/,
+                exclude: /node_modules/,
+                use:jsLoaders ()
+            },
+	    {
+                test: /\.ts$/,					- ts
+                exclude: /node_modules/,
+                loader: {
+                    loader: 'babel-loader',
+                    options: {
+                        presets: [
+                            '@babel/preset-env',
+                            '@babel/preset-typescript'
+                        ],
+                        plugins: [
+                            '@babel/plugin-proposal-class-properties'
+                        ]
+                    }
+                }
+            }
+        ]
+    }
+
+}
+
